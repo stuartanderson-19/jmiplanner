@@ -118,7 +118,7 @@ export default function PlannerClient({ meetings, actions: initActions, lastSync
             <div className="w-7 h-7 rounded-lg bg-brand-600 flex items-center justify-center">
               <ListTodo size={14} className="text-white" />
             </div>
-            <span className="font-display text-lg text-ink-primary">JMI Planner</span>
+            <span className=" text-lg text-ink-primary">JMI Planner</span>
             <span className="text-ink-muted text-sm hidden sm:block">· {format(new Date(), 'EEE d MMM')}</span>
           </div>
           <div className="flex items-center gap-2">
@@ -151,7 +151,7 @@ export default function PlannerClient({ meetings, actions: initActions, lastSync
           ].map(s => (
             <div key={s.label} className="bg-white rounded-2xl border border-surface-3 p-4">
               <div className={`flex items-center gap-1.5 text-xs mb-2 ${s.col}`}>{s.icon}<span className="text-ink-tertiary">{s.label}</span></div>
-              <div className="text-2xl font-semibold text-ink-primary font-display">{s.value}</div>
+              <div className="text-2xl font-semibold text-ink-primary ">{s.value}</div>
               {s.bar && <div className="mt-2 h-1 bg-surface-3 rounded-full overflow-hidden"><div className="h-full bg-emerald-400 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} /></div>}
             </div>
           ))}
