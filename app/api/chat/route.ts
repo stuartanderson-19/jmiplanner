@@ -93,6 +93,7 @@ ${contextBlock}
         ...conversationHistory,
         { role: 'user', content: messages }
       ],
+      betas: ['mcp-client-2025-04-04'],
       mcp_servers: [
         { type: 'url', url: process.env.GRANOLA_MCP_URL || 'https://mcp.granola.ai/mcp', name: 'granola' },
         { type: 'url', url: 'https://mcp.slack.com/mcp', name: 'slack' },

@@ -18,51 +18,55 @@ export interface ExtractedMeeting {
   actions: ExtractedAction[]
 }
 
-export async function syncGranolaMeetings(timeRange: 'this_week' | 'last_week' | 'last_30_days' = 'last_30_days') {
+// Extract actions from a meeting summary using Claude
+async function extractActions(meeting: { id: string; title: string; summary: string; date: string; participants: string[] }): Promise<ExtractedAction[]> {
+  const resp = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1000,
+    messages: [{
+      role: 'user',
+      content: `Extract ALL action items, next steps, follow-ups, and commitments from this meeting summary. Return ONLY a JSON array, no markdown:
+[{"text": "action description", "owner": "person name or Both or Stuart", "priority": "high|medium|low"}]
+
+Meeting: ${meeting.title}
+Date: ${meeting.date}
+
+Summary:
+${meeting.summary}
+
+If no actions, return [].`
+    }]
+  })
+
+  const text = resp.content.find(b => b.type === 'text')?.text?.trim() || '[]'
+  try {
+    const clean = text.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim()
+    const start = clean.indexOf('[')
+    const end = clean.lastIndexOf(']')
+    if (start === -1) return []
+    return JSON.parse(clean.slice(start, end + 1))
+  } catch {
+    return []
+  }
+}
+
+export async function syncGranolaMeetings(
+  timeRange: 'this_week' | 'last_week' | 'last_30_days' = 'last_30_days',
+  meetingsData?: ExtractedMeeting[]
+) {
   const db = supabaseAdmin()
   const logs: string[] = []
+  let newMeetings = 0
+  let newActions = 0
 
   try {
-    logs.push(`Starting Granola sync for range: ${timeRange}`)
+    logs.push(`Starting sync`)
 
-    // Step 1: List meetings via Granola MCP
-    const listResp = await (client.messages.create as any)({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
-      system: `You are a data extraction assistant. Use the Granola MCP to list meetings for the given time range, then fetch their full details in batches of 10. 
-Return ONLY a JSON array (no markdown, no preamble) with this shape:
-[{
-  "granola_id": "uuid",
-  "title": "meeting title",
-  "meeting_date": "ISO8601 date string",
-  "participants": ["name1", "name2"],
-  "summary": "full summary text",
-  "actions": [
-    { "text": "action description", "owner": "person name or Both", "priority": "high|medium|low" }
-  ]
-}]
-Extract ALL action items, next steps, follow-ups, and commitments. Be thorough. If a meeting has no clear actions, return an empty array for actions.`,
-      messages: [{ role: 'user', content: `List all meetings from time_range="${timeRange}", fetch their details in batches, extract all action items, and return the JSON array.` }],
-      mcp_servers: [{ type: 'url', url: process.env.GRANOLA_MCP_URL || 'https://mcp.granola.ai/mcp', name: 'granola' }],
-    })
-
-    const textBlock = listResp.content.find((b: any) => b.type === 'text')
-    if (!textBlock || textBlock.type !== 'text') throw new Error('No text response from Granola sync')
-
-    let raw = textBlock.text.trim().replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim()
-    const start = raw.indexOf('[')
-    const end = raw.lastIndexOf(']')
-    if (start === -1 || end === -1) throw new Error('No JSON array in response')
-    raw = raw.slice(start, end + 1)
-
-    const meetings: ExtractedMeeting[] = JSON.parse(raw)
-    logs.push(`Extracted ${meetings.length} meetings`)
-
-    let newMeetings = 0
-    let newActions = 0
+    // If meetings data is passed in directly (from the sync route which calls Granola natively)
+    const meetings = meetingsData || []
+    logs.push(`Processing ${meetings.length} meetings`)
 
     for (const meeting of meetings) {
-      // Upsert meeting
       const { data: existing } = await db
         .from('meetings')
         .select('id')
@@ -73,7 +77,6 @@ Extract ALL action items, next steps, follow-ups, and commitments. Be thorough. 
 
       if (existing) {
         meetingId = existing.id
-        // Update summary in case it changed
         await db.from('meetings').update({
           summary: meeting.summary,
           title: meeting.title,
@@ -87,19 +90,30 @@ Extract ALL action items, next steps, follow-ups, and commitments. Be thorough. 
           summary: meeting.summary,
         }).select('id').single()
 
-        if (error) { logs.push(`Error inserting meeting ${meeting.title}: ${error.message}`); continue }
+        if (error) { logs.push(`Error inserting ${meeting.title}: ${error.message}`); continue }
         meetingId = inserted.id
         newMeetings++
       }
 
-      // Insert new actions (skip if meeting already had actions synced)
+      // Extract and insert actions for new meetings
       if (!existing) {
-        for (const action of meeting.actions) {
+        let actions = meeting.actions
+        // If no actions pre-extracted, use Claude to extract them
+        if (!actions || actions.length === 0) {
+          actions = await extractActions({
+            id: meeting.granola_id,
+            title: meeting.title,
+            summary: meeting.summary,
+            date: meeting.meeting_date,
+            participants: meeting.participants,
+          })
+        }
+        for (const action of actions) {
           await db.from('actions').insert({
             meeting_id: meetingId,
             text: action.text,
-            owner: action.owner,
-            priority: action.priority,
+            owner: action.owner || '',
+            priority: action.priority || 'medium',
             done: false,
           })
           newActions++
