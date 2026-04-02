@@ -66,11 +66,25 @@ export default function PlannerClient({ meetings, actions: initActions, lastSync
   const handleSync = async () => {
     setSyncing(true); setSyncMsg(null)
     try {
-      const res = await fetch('/api/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ timeRange: 'last_30_days' }) })
+      const res = await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timeRange: 'last_30_days' }),
+        signal: AbortSignal.timeout(240000), // 4 min timeout
+      })
       const d = await res.json()
-      setSyncMsg(d.success ? `Synced: ${d.newMeetings} new meetings, ${d.newActions} new actions` : `Error: ${d.error}`)
-      if (d.success) setTimeout(() => window.location.reload(), 1500)
-    } catch { setSyncMsg('Sync failed') }
+      if (d.success) {
+        setSyncMsg(d.newMeetings > 0
+          ? `Synced ${d.newMeetings} new meeting${d.newMeetings !== 1 ? 's' : ''} and ${d.newActions} action${d.newActions !== 1 ? 's' : ''}`
+          : 'Already up to date — no new meetings found'
+        )
+        setTimeout(() => window.location.reload(), 1500)
+      } else {
+        setSyncMsg(`Sync error: ${d.error || 'unknown error'}`)
+      }
+    } catch (e: any) {
+      setSyncMsg(e.name === 'TimeoutError' ? 'Sync timed out — try again' : 'Sync failed — check connection')
+    }
     setSyncing(false)
   }
 
@@ -125,7 +139,7 @@ export default function PlannerClient({ meetings, actions: initActions, lastSync
             {lastSync && <span className="text-xs text-ink-tertiary hidden sm:block">Synced {formatDistanceToNow(new Date(lastSync.ran_at), { addSuffix: true })}</span>}
             <button onClick={handleSync} disabled={syncing} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-surface-3 bg-white text-ink-secondary hover:bg-surface-1 transition-colors disabled:opacity-50">
               <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} />
-              {syncing ? 'Syncing…' : 'Sync Granola'}
+              {syncing ? 'Syncing… (up to 2 min)' : 'Sync Granola'}
             </button>
             <button onClick={() => setChatOpen(true)} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-800 transition-colors">
               <MessageSquare size={12} />Ask AI
