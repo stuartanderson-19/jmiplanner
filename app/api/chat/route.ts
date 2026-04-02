@@ -87,7 +87,7 @@ ${contextBlock}
     const textBlock = response.content.find(b => b.type === 'text')
     const text = textBlock?.type === 'text' ? textBlock.text : ''
 
-    const actionMatches = [...text.matchAll(/<action>(.*?)<\/action>/gs)]
+    const actionMatches = [...text.matchAll(new RegExp("<action>(.*?)<\/action>", "gs"))]
     const parsedActions = []
     for (const match of actionMatches) {
       try { parsedActions.push(JSON.parse(match[1])) } catch {}
@@ -111,7 +111,7 @@ ${contextBlock}
       }
     }
 
-    const cleanText = text.replace(/<action>.*?<\/action>/gs, '').trim()
+    const cleanText = text.replace(new RegExp("<action>.*?<\/action>", "gs"), '').trim()
     return NextResponse.json({ text: cleanText, actions: parsedActions, executionResults, usage: response.usage })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })

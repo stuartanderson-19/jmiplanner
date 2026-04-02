@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     new_meetings: result.newMeetings ?? 0,
     new_actions: result.newActions ?? 0,
     logs: result.logs,
-  }).catch(() => {})
+  })
 
   return NextResponse.json(result)
 }
