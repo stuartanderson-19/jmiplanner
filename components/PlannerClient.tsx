@@ -70,20 +70,21 @@ export default function PlannerClient({ meetings, actions: initActions, lastSync
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ timeRange: 'last_30_days' }),
-        signal: AbortSignal.timeout(240000), // 4 min timeout
       })
       const d = await res.json()
-      if (d.success) {
+      if (d.needsData) {
+        setSyncMsg('To sync, open Claude.ai and say "sync my planner" — Claude will pull your Granola meetings automatically.')
+      } else if (d.success) {
         setSyncMsg(d.newMeetings > 0
-          ? `Synced ${d.newMeetings} new meeting${d.newMeetings !== 1 ? 's' : ''} and ${d.newActions} action${d.newActions !== 1 ? 's' : ''}`
-          : 'Already up to date — no new meetings found'
+          ? `Synced ${d.newMeetings} new meeting${d.newMeetings !== 1 ? 's' : ''} and ${d.newActions} new action${d.newActions !== 1 ? 's' : ''}`
+          : 'Already up to date'
         )
-        setTimeout(() => window.location.reload(), 1500)
+        if (d.newMeetings > 0) setTimeout(() => window.location.reload(), 1500)
       } else {
         setSyncMsg(`Sync error: ${d.error || 'unknown error'}`)
       }
-    } catch (e: any) {
-      setSyncMsg(e.name === 'TimeoutError' ? 'Sync timed out — try again' : 'Sync failed — check connection')
+    } catch {
+      setSyncMsg('Sync failed — check connection')
     }
     setSyncing(false)
   }
@@ -139,7 +140,7 @@ export default function PlannerClient({ meetings, actions: initActions, lastSync
             {lastSync && <span className="text-xs text-ink-tertiary hidden sm:block">Synced {formatDistanceToNow(new Date(lastSync.ran_at), { addSuffix: true })}</span>}
             <button onClick={handleSync} disabled={syncing} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-surface-3 bg-white text-ink-secondary hover:bg-surface-1 transition-colors disabled:opacity-50">
               <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} />
-              {syncing ? 'Syncing… (up to 2 min)' : 'Sync Granola'}
+              {syncing ? 'Syncing…' : 'Sync Granola'}
             </button>
             <button onClick={() => setChatOpen(true)} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-800 transition-colors">
               <MessageSquare size={12} />Ask AI
@@ -150,8 +151,12 @@ export default function PlannerClient({ meetings, actions: initActions, lastSync
 
       <div className="max-w-5xl mx-auto px-4 py-6">
         {syncMsg && (
-          <div className={`mb-4 px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 ${syncMsg.startsWith('Error') ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
-            {syncMsg.startsWith('Error') ? <AlertCircle size={14} /> : <Zap size={14} />}
+          <div className={`mb-4 px-4 py-2.5 rounded-xl text-sm flex items-start gap-2 ${
+            syncMsg.startsWith('Sync error') ? 'bg-red-50 text-red-700 border border-red-200' :
+            syncMsg.startsWith('To sync') ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+            'bg-emerald-50 text-emerald-700 border border-emerald-200'
+          }`}>
+            {syncMsg.startsWith('Sync error') ? <AlertCircle size={14} className="flex-shrink-0 mt-0.5" /> : <Zap size={14} className="flex-shrink-0 mt-0.5" />}
             {syncMsg}
           </div>
         )}
