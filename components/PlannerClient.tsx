@@ -41,10 +41,22 @@ export default function PlannerClient({ meetings, actions: initActions, lastSync
 
   const colorMap = Object.fromEntries(meetings.map((m, i) => [m.id, MTG_COLORS[i % MTG_COLORS.length]]))
 
+  const isMine = (a: Action) => { const o = a.owner.toLowerCase(); return o.includes('stuart') || o === 'both' }
+  const isOthers = (a: Action) => { const o = a.owner.toLowerCase(); return !o.includes('stuart') && o !== 'both' }
+
   const open = actions.filter(a => !a.done)
   const done = actions.filter(a => a.done)
   const highOpen = open.filter(a => a.priority === 'high')
-  const pct = actions.length ? Math.round(done.length / actions.length * 100) : 0
+
+  const myOpen = open.filter(isMine)
+  const myDone = done.filter(isMine)
+  const myTotal = myOpen.length + myDone.length
+  const myPct = myTotal ? Math.round(myDone.length / myTotal * 100) : 0
+
+  const othersOpen = open.filter(isOthers)
+  const othersDone = done.filter(isOthers)
+  const othersTotal = othersOpen.length + othersDone.length
+  const othersPct = othersTotal ? Math.round(othersDone.length / othersTotal * 100) : 0
 
   const filterActs = (acts: Action[]) => acts.filter(a => {
     if (!showDone && a.done) return false
@@ -161,19 +173,55 @@ export default function PlannerClient({ meetings, actions: initActions, lastSync
           </div>
         )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          {[
-            { label: 'Meetings', value: meetings.length, icon: <Calendar size={14} />, col: 'text-brand-600' },
-            { label: 'Open actions', value: open.length, icon: <ListTodo size={14} />, col: 'text-ink-secondary' },
-            { label: 'High priority', value: highOpen.length, icon: <AlertCircle size={14} />, col: 'text-red-500' },
-            { label: 'Completed', value: `${done.length} (${pct}%)`, icon: <TrendingUp size={14} />, col: 'text-emerald-600', bar: true },
-          ].map(s => (
-            <div key={s.label} className="bg-white rounded-2xl border border-surface-3 p-4">
-              <div className={`flex items-center gap-1.5 text-xs mb-2 ${s.col}`}>{s.icon}<span className="text-ink-tertiary">{s.label}</span></div>
-              <div className="text-2xl font-semibold text-ink-primary ">{s.value}</div>
-              {s.bar && <div className="mt-2 h-1 bg-surface-3 rounded-full overflow-hidden"><div className="h-full bg-emerald-400 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} /></div>}
+        {/* Top row: meetings + high priority */}
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="bg-white rounded-2xl border border-surface-3 p-4">
+            <div className="flex items-center gap-1.5 text-xs mb-2 text-brand-600"><Calendar size={14} /><span className="text-ink-tertiary">Meetings</span></div>
+            <div className="text-2xl font-semibold text-ink-primary">{meetings.length}</div>
+          </div>
+          <div className="bg-white rounded-2xl border border-surface-3 p-4">
+            <div className="flex items-center gap-1.5 text-xs mb-2 text-red-500"><AlertCircle size={14} /><span className="text-ink-tertiary">High priority open</span></div>
+            <div className="text-2xl font-semibold text-ink-primary">{highOpen.length}</div>
+          </div>
+        </div>
+        {/* Split: mine vs others */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          {/* Mine */}
+          <div className="bg-white rounded-2xl border border-surface-3 p-4">
+            <div className="flex items-center gap-1.5 text-xs mb-3 text-brand-600"><ListTodo size={14} /><span className="font-medium text-ink-secondary">My actions</span></div>
+            <div className="flex gap-4 mb-3">
+              <div>
+                <div className="text-xs text-ink-tertiary mb-0.5">Open</div>
+                <div className="text-xl font-semibold text-ink-primary">{myOpen.length}</div>
+              </div>
+              <div>
+                <div className="text-xs text-ink-tertiary mb-0.5">Done</div>
+                <div className="text-xl font-semibold text-emerald-600">{myDone.length}</div>
+              </div>
             </div>
-          ))}
+            <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
+              <div className="h-full bg-brand-400 rounded-full transition-all duration-500" style={{ width: `${myPct}%` }} />
+            </div>
+            <div className="text-xs text-ink-tertiary mt-1">{myPct}% complete</div>
+          </div>
+          {/* Others */}
+          <div className="bg-white rounded-2xl border border-surface-3 p-4">
+            <div className="flex items-center gap-1.5 text-xs mb-3 text-amber-600"><ListTodo size={14} /><span className="font-medium text-ink-secondary">Others' actions</span></div>
+            <div className="flex gap-4 mb-3">
+              <div>
+                <div className="text-xs text-ink-tertiary mb-0.5">Open</div>
+                <div className="text-xl font-semibold text-ink-primary">{othersOpen.length}</div>
+              </div>
+              <div>
+                <div className="text-xs text-ink-tertiary mb-0.5">Done</div>
+                <div className="text-xl font-semibold text-emerald-600">{othersDone.length}</div>
+              </div>
+            </div>
+            <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
+              <div className="h-full bg-amber-400 rounded-full transition-all duration-500" style={{ width: `${othersPct}%` }} />
+            </div>
+            <div className="text-xs text-ink-tertiary mt-1">{othersPct}% complete</div>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 mb-5">
