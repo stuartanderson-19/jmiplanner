@@ -29,8 +29,7 @@ export default function PlannerClient({ meetings, actions: initActions, lastSync
   const [filterOwner, setFilterOwner] = useState<'all'|'stuart'|'others'>('all')
   const [filterPri, setFilterPri] = useState<'all'|'high'|'medium'|'low'>('all')
   const [showDone, setShowDone] = useState(false)
-  const [syncing, setSyncing] = useState(false)
-  const [syncMsg, setSyncMsg] = useState<string|null>(null)
+
   const [chatOpen, setChatOpen] = useState(false)
   const [msgs, setMsgs] = useState<ChatMessage[]>([{ role: 'assistant', content: "Hi Stuart! I can tick off actions, set Slack reminders, search your meeting notes, or help you decide what to focus on. What do you need?" }])
   const [input, setInput] = useState('')
@@ -75,30 +74,9 @@ export default function PlannerClient({ meetings, actions: initActions, lastSync
 
   const toggleMtg = (id: string) => setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
-  const handleSync = async () => {
-    setSyncing(true); setSyncMsg(null)
-    try {
-      const res = await fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ timeRange: 'last_30_days' }),
-      })
-      const d = await res.json()
-      if (d.needsData) {
-        setSyncMsg('To sync, open Claude.ai and say "sync my planner" — Claude will pull your Granola meetings automatically.')
-      } else if (d.success) {
-        setSyncMsg(d.newMeetings > 0
-          ? `Synced ${d.newMeetings} new meeting${d.newMeetings !== 1 ? 's' : ''} and ${d.newActions} new action${d.newActions !== 1 ? 's' : ''}`
-          : 'Already up to date'
-        )
-        if (d.newMeetings > 0) setTimeout(() => window.location.reload(), 1500)
-      } else {
-        setSyncMsg(`Sync error: ${d.error || 'unknown error'}`)
-      }
-    } catch {
-      setSyncMsg('Sync failed — check connection')
-    }
-    setSyncing(false)
+  const handleSync = () => {
+    // Sync is handled by Claude — open Claude.ai with pre-filled message
+    window.open('https://claude.ai/new?q=Sync+my+planner', '_blank')
   }
 
   const sendChat = async () => {
@@ -150,9 +128,9 @@ export default function PlannerClient({ meetings, actions: initActions, lastSync
           </div>
           <div className="flex items-center gap-2">
             {lastSync && <span className="text-xs text-ink-tertiary hidden sm:block">Synced {formatDistanceToNow(new Date(lastSync.ran_at), { addSuffix: true })}</span>}
-            <button onClick={handleSync} disabled={syncing} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-surface-3 bg-white text-ink-secondary hover:bg-surface-1 transition-colors disabled:opacity-50">
-              <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} />
-              {syncing ? 'Syncing…' : 'Sync Granola'}
+            <button onClick={handleSync} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-surface-3 bg-white text-ink-secondary hover:bg-surface-1 transition-colors">
+              <RefreshCw size={12} />
+              Sync Granola
             </button>
             <button onClick={() => setChatOpen(true)} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-800 transition-colors">
               <MessageSquare size={12} />Ask AI
@@ -162,16 +140,6 @@ export default function PlannerClient({ meetings, actions: initActions, lastSync
       </nav>
 
       <div className="max-w-5xl mx-auto px-4 py-6">
-        {syncMsg && (
-          <div className={`mb-4 px-4 py-2.5 rounded-xl text-sm flex items-start gap-2 ${
-            syncMsg.startsWith('Sync error') ? 'bg-red-50 text-red-700 border border-red-200' :
-            syncMsg.startsWith('To sync') ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-            'bg-emerald-50 text-emerald-700 border border-emerald-200'
-          }`}>
-            {syncMsg.startsWith('Sync error') ? <AlertCircle size={14} className="flex-shrink-0 mt-0.5" /> : <Zap size={14} className="flex-shrink-0 mt-0.5" />}
-            {syncMsg}
-          </div>
-        )}
 
         {/* Top row: meetings + high priority */}
         <div className="grid grid-cols-2 gap-3 mb-3">
