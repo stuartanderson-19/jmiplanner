@@ -75,8 +75,7 @@ export default function PlannerClient({ meetings, actions: initActions, lastSync
   const toggleMtg = (id: string) => setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   const handleSync = () => {
-    // Sync is handled by Claude — open Claude.ai with pre-filled message
-    window.open('https://claude.ai/new?q=Sync+my+planner', '_blank')
+    window.open('https://claude.ai/chat/226c0a04-1495-4254-9ae3-62ad2844fd4a', '_blank')
   }
 
   const sendChat = async () => {
