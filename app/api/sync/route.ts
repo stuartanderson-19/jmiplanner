@@ -4,9 +4,12 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export const maxDuration = 300
 
+// Allow Claude to call this from anywhere using a shared secret
+const SYNC_SECRET = process.env.SYNC_SECRET || process.env.CRON_SECRET || ''
+
 export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (auth !== `Bearer ${SYNC_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   return NextResponse.json({
@@ -17,6 +20,16 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // Accept calls from Claude (with secret) OR from same-origin (browser button)
+  const auth = req.headers.get('authorization')
+  const origin = req.headers.get('origin') || ''
+  const isSameOrigin = origin.includes('jmiplanner.vercel.app') || origin.includes('localhost')
+  const hasValidSecret = SYNC_SECRET && auth === `Bearer ${SYNC_SECRET}`
+
+  if (!isSameOrigin && !hasValidSecret) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const body = await req.json().catch(() => ({}))
   const meetings: ExtractedMeeting[] = body.meetings || []
   const timeRange = body.timeRange || 'last_30_days'
